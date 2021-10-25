@@ -23,5 +23,6 @@ public class ResponseUserDTO implements Serializable {
     Date modified;
     Date lastLogin;
     Boolean isActive;
+    String bearer;
     List<PhonesDTO> phones;
 }

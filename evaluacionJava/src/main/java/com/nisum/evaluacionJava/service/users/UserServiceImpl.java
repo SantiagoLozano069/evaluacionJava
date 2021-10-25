@@ -80,7 +80,7 @@ public class UserServiceImpl implements IUserService {
                             ResponseUserDTO usDto = ResponseUserDTO.builder().id(us.getId()).name(us.getName()).email(us.getEmail())
                                     .password(us.getPassword()).created(us.getCreated()).modified(us.getModified())
                                     .lastLogin(us.getLastLogin()).isActive(us.getActive() == 1 ? true : false)
-                                    .phones(phonesDtoList)
+                                    .bearer(us.getBearer()).phones(phonesDtoList)
                                     .build();
                             return new Response<ResponseUserDTO>(usDto);
                         } else {
