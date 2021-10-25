@@ -11,4 +11,8 @@ public interface IUserFacade {
     User getUserByEmail(String email);
 
     User getUserById(String id);
+
+    List<User> getAll();
+
+    void updateStateToFalse(String id);
 }

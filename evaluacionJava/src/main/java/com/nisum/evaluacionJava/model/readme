@@ -1,2 +1,3 @@
 MODULO MODEL:
-En este paquete se establecen las clases de implementación de tipo entidad.
+En este paquete se establecen las clases de implementación de tipo entidad que representan
+las tablas de la base de datos.

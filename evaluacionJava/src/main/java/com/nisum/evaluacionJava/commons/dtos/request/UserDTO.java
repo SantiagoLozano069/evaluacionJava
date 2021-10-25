@@ -17,5 +17,5 @@ public class UserDTO implements Serializable {
     String email;
     String password;
     List<PhonesDTO> phones;
-    String token;
+    String bearer;
 }

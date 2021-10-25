@@ -32,4 +32,14 @@ public class UserImpl implements IUserFacade {
         return iUserFacade.getById(id);
     }
 
+    @Override
+    public List<User> getAll() {
+        return iUserFacade.findAll();
+    }
+
+    @Override
+    public void updateStateToFalse(String id) {
+        iUserFacade.updateStateToFalse(id);
+    }
+
 }

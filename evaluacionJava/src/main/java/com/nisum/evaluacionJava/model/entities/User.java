@@ -49,4 +49,7 @@ public class User implements Serializable {
     @Column(name = "active ")
     private Integer active;
 
+    @Column(name = "Bearer_Token")
+    private String bearer;
+
 }

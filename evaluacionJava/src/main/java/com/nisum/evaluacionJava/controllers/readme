@@ -1,2 +1,3 @@
 MODULO CONTROLLER:
-Este modulo contiene la logica necesaria para redireccionar la petición del usuario hacia el modulo de la logica del negocio
+Este modulo contiene la logica necesaria para redireccionar la petición del usuario
+hacia el modulo de la logica del negocio

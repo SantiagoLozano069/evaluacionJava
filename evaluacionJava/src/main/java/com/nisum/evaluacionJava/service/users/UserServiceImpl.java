@@ -5,12 +5,16 @@ import com.nisum.evaluacionJava.commons.converter.UserConverter;
 import com.nisum.evaluacionJava.commons.dtos.request.PhonesDTO;
 import com.nisum.evaluacionJava.commons.dtos.request.UserDTO;
 import com.nisum.evaluacionJava.commons.dtos.response.ResponseError;
+import com.nisum.evaluacionJava.commons.dtos.response.ResponseUnauthorized;
 import com.nisum.evaluacionJava.commons.dtos.response.ResponseUserDTO;
 import com.nisum.evaluacionJava.commons.enums.ValidateRequest;
 import com.nisum.evaluacionJava.commons.generic.Response;
 import com.nisum.evaluacionJava.model.entities.Phone;
+import com.nisum.evaluacionJava.model.entities.Token;
 import com.nisum.evaluacionJava.model.entities.User;
+import com.nisum.evaluacionJava.repository.tokens.impl.ITokenFacade;
 import com.nisum.evaluacionJava.repository.users.impl.IUserFacade;
+import com.nisum.evaluacionJava.service.tokens.ITokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,80 +29,94 @@ public class UserServiceImpl implements IUserService {
 
     private final IUserFacade iUserFacade;
     private final UserConverter userConverter;
-
     private final PhonesConverter phonesConverter;
+    private final ITokenFacade iTokenFacade;
+    private final ITokenService iTokenService;
 
     @Autowired
-    UserServiceImpl(IUserFacade iUserFacade, UserConverter userConverter, PhonesConverter phonesConverter) {
+    UserServiceImpl(IUserFacade iUserFacade, UserConverter userConverter, PhonesConverter phonesConverter,
+                    ITokenFacade iTokenFacade, ITokenService iTokenService) {
         this.iUserFacade = iUserFacade;
         this.userConverter = userConverter;
-
         this.phonesConverter = phonesConverter;
+        this.iTokenFacade = iTokenFacade;
+        this.iTokenService = iTokenService;
     }
 
     @Override
     public Response createUser(UserDTO userDto) throws Exception {
-        String idUser = UUID.randomUUID().toString();
-        try {
-            //Validar request
-            ValidateRequest validationRequest = validateRequest(userDto);
-            if (validationRequest == ValidateRequest.SUCCESS_RESQUEST) {
 
-                //Validar si el Email exite en base de datos
-                Optional<User> IsEmailExist = Optional.ofNullable(iUserFacade.getUserByEmail(userDto.getEmail()));
-                if (!IsEmailExist.isPresent()) {
+        String[] bearer = userDto.getBearer().split("Bearer ");
+        //Validar que el token esté activo
+        Optional<Token> token = Optional.ofNullable(iTokenFacade.getTokenByBearer(bearer[1]));
+        if (token.isPresent()) {
 
-                    //Transformaciones DTO to Entities
-                    User user = userConverter.converterUserDtoToUserEntity(userDto);
-                    List<Phone> phonesEntitiesList = phonesConverter.listPhonesDtoToListPhonesEntities(userDto.getPhones(), user);
+            String idUser = UUID.randomUUID().toString();
+            try {
+                //Validar request
+                ValidateRequest validationRequest = validateRequest(userDto);
+                if (validationRequest == ValidateRequest.SUCCESS_RESQUEST) {
 
-                    user.setId(idUser);
-                    user.setPhones(phonesEntitiesList);
+                    //Validar si el Email exite en base de datos
+                    Optional<User> IsEmailExist = Optional.ofNullable(iUserFacade.getUserByEmail(userDto.getEmail()));
+                    if (!IsEmailExist.isPresent()) {
 
-                    //Guardar información en base de datos
-                    iUserFacade.createUser(user);
+                        //Transformaciones DTO to Entities
+                        User user = userConverter.converterUserDtoToUserEntity(userDto);
+                        List<Phone> phonesEntitiesList = phonesConverter.listPhonesDtoToListPhonesEntities(userDto.getPhones(), user);
 
-                    //Validamos que el usuario se haya creado en base de datos
-                    Optional<User> resultBd = Optional.ofNullable(iUserFacade.getUserById(idUser));
-                    if (resultBd.isPresent()) {
-                        User us = resultBd.get();
-                        List<PhonesDTO> phonesDtoList = phonesConverter.listPhonesEntitiesToListPhonesDto(us.getPhones());
-                        ResponseUserDTO usDto = ResponseUserDTO.builder().id(us.getId()).name(us.getName()).email(us.getEmail())
-                                .password(us.getPassword()).created(us.getCreated()).modified(us.getModified())
-                                .lastLogin(us.getLastLogin()).isActive(us.getActive() == 1 ? true : false)
-                                .phones(phonesDtoList)
-                                .build();
-                        return new Response<ResponseUserDTO>(usDto);
+                        user.setId(idUser);
+                        user.setPhones(phonesEntitiesList);
+                        user.setBearer(bearer[1]);
+
+                        //Guardar información en base de datos
+                        iUserFacade.createUser(user);
+
+                        //Validamos que el usuario se haya creado en base de datos
+                        Optional<User> resultBd = Optional.ofNullable(iUserFacade.getUserById(idUser));
+                        if (resultBd.isPresent()) {
+                            User us = resultBd.get();
+                            List<PhonesDTO> phonesDtoList = phonesConverter.listPhonesEntitiesToListPhonesDto(us.getPhones());
+                            ResponseUserDTO usDto = ResponseUserDTO.builder().id(us.getId()).name(us.getName()).email(us.getEmail())
+                                    .password(us.getPassword()).created(us.getCreated()).modified(us.getModified())
+                                    .lastLogin(us.getLastLogin()).isActive(us.getActive() == 1 ? true : false)
+                                    .phones(phonesDtoList)
+                                    .build();
+                            return new Response<ResponseUserDTO>(usDto);
+                        } else {
+                            return new Response<ResponseError>(ResponseError.builder()
+                                    .mensaje("Error, No se pudo recuperar los datos del usuario en la base de datos")
+                                    .build());
+                        }
                     } else {
                         return new Response<ResponseError>(ResponseError.builder()
-                                .mensaje("Error, No se pudo recuperar los datos del usuario en la base de datos")
-                                .build());
+                                .mensaje("El E-mail ya está registrado en Base de datos").build());
                     }
                 } else {
+                    String mensaje = "";
+                    switch (validationRequest) {
+                        case NULL_ATRIBUTE:
+                            mensaje = "Hacen falta atributos del usuario";
+                            break;
+                        case NULL_PHONE:
+                            mensaje = "Debe agregar almenos un dato de contacto";
+                            break;
+                        case INVALIDATE_EMAIL:
+                            mensaje = "El E-mail no tiene un formato válido";
+                            break;
+                        case INVALIDATE_PASSWORD:
+                            mensaje = "La contraseña debe tener una letras mayusculas, letras minúsculas y numeros";
+                            break;
+                    }
                     return new Response<ResponseError>(ResponseError.builder()
-                            .mensaje("El E-mail ya está registrado en Base de datos").build());
+                            .mensaje(mensaje).build());
                 }
-            } else {
-                String mensaje = "";
-                switch (validationRequest) {
-                    case NULL_ATRIBUTE:
-                        mensaje = "Hacen falta atributos del usuario";
-                        break;
-                    case NULL_PHONE:
-                        mensaje = "Debe agregar almenos un dato de contacto";
-                        break;
-                    case INVALIDATE_EMAIL:
-                        mensaje = "El E-mail no tiene un formato válido";
-                        break;
-                    case INVALIDATE_PASSWORD:
-                        mensaje = "La contraseña debe tener una letra mayuscula, letras minúsculas, y dos numeros";
-                        break;
-                }
-                return new Response<ResponseError>(ResponseError.builder()
-                        .mensaje(mensaje).build());
+            } catch (Exception ex) {
+                throw new Exception(ex.getMessage(), ex.getCause());
             }
-        } catch (Exception ex) {
-            throw new Exception(ex.getMessage(), ex.getCause());
+        } else {
+            return new Response<ResponseUnauthorized>(ResponseUnauthorized.builder()
+                    .mensaje(iTokenService.createToken()).build());
         }
     }
 
@@ -134,5 +152,4 @@ public class UserServiceImpl implements IUserService {
 
         return ValidateRequest.SUCCESS_RESQUEST;
     }
-
 }
